@@ -1,3 +1,34 @@
+# Recipe Finder App
+
+Live demo: https://gmd9v9-5173.csb.app/  
+Repo: https://github.com/acode8/Recipe-Finder-App
+
+## Purpose
+A simple recipe search & filter application that helps users find recipes and filter by dietary preference (veg, non-veg, vegan).
+
+## Features
+- Search recipes by name/ingredient
+- Filter results: All | Veg | Non-Veg | Vegan
+- Responsive UI
+- Deployed on CodeSandbox
+
+## How the dietary filter works
+- Primary: Uses `strCategory` (if available) to detect vegetarian/vegan meals.
+- Secondary: Scans ingredient fields (`strIngredient1..20`) for animal-product keywords.
+- This combined approach increases detection accuracy for datasets without explicit diet tags.
+
+## ChatGPT Assistance (Level 1 evidence)
+I used ChatGPT to design the filtering logic and to prepare this README:
+- Date(s): 2025-10-28 — 2025-10-29
+- Summary: ChatGPT provided the ingredient-scan functions and the submission checklist.
+
+## How to run locally
+1. Clone:
+   ```bash
+   git clone https://github.com/acode8/Recipe-Finder-App.git
+   cd Recipe-Finder-App
+
+//    
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
