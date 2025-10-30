@@ -57,3 +57,51 @@ body {
   min-height: 100vh;
   backdrop-filter: blur(6px);
 }
+/* Mobile Responsive Layout Fix */
+@media (max-width: 768px) {
+  /* Category container */
+  section {
+    padding: 1.5rem;
+  }
+
+  /* Make buttons and input stack neatly */
+  section .flex {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Adjust category buttons */
+  section .flex-wrap {
+    justify-content: center;
+    gap: 10px;
+  }
+
+  /* Search input + button layout */
+  section .flex.gap-3 {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  section input {
+    width: 90%;
+    max-width: 280px;
+    border-radius: 12px;
+  }
+
+  section button {
+    width: 70%;
+    max-width: 180px;
+    border-radius: 12px;
+  }
+}
+
+/* Slightly smaller screens (like iPhone SE, 375px) */
+@media (max-width: 420px) {
+  section input {
+    width: 95%;
+  }
+  section button {
+    width: 80%;
+  }
+}
