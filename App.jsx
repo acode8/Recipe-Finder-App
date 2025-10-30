@@ -3,10 +3,77 @@ import "./App.css";
 
 /* Ingredient dataset */
 const categoryItems = {
-  Veg: ["Paneer", "Spinach", "Rice", "Potato", "Cauliflower"],
-  "Non-Veg": ["Chicken", "Beef", "Egg", "Fish", "Salmon"],
-  Vegan: ["Tofu", "Broccoli", "Carrot", "Mushroom", "Beans", "Quinoa"],
+  All: [
+    "Paneer",
+    "Spinach",
+    "Cauliflower",
+    "Rice",
+    "Chicken",
+    "Beef",
+    "Egg",
+    "Tuna",
+    "Salmon",
+    "Tofu",
+    "Broccoli",
+    "Carrot",
+    "Quinoa",
+  ],
+  Veg: ["Paneer", "Spinach", "Cauliflower", "Rice"],
+  "Non-Veg": ["Chicken", "Beef", "Egg", "Tuna", "Salmon"],
+  Vegan: ["Tofu", "Broccoli", "Carrot", "Quinoa"],
 };
+
+/* --- Veg / Non-Veg / Vegan Detection Helpers --- */
+const NON_VEG_KEYWORDS = [
+  "chicken",
+  "beef",
+  "pork",
+  "fish",
+  "salmon",
+  "tuna",
+  "shrimp",
+  "prawn",
+  "egg",
+  "bacon",
+  "ham",
+  "crab",
+  "lamb",
+];
+const VEGAN_BLACKLIST = [
+  ...NON_VEG_KEYWORDS,
+  "milk",
+  "cheese",
+  "butter",
+  "yogurt",
+  "cream",
+  "paneer",
+  "ghee",
+];
+
+const norm = (s) => (s || "").toLowerCase();
+
+function isNonVeg(meal) {
+  const name = norm(meal.strMeal);
+  return NON_VEG_KEYWORDS.some((nv) => name.includes(nv));
+}
+
+function isVegan(meal) {
+  const name = norm(meal.strMeal);
+  return !VEGAN_BLACKLIST.some((nv) => name.includes(nv));
+}
+
+function isVeg(meal) {
+  return !isNonVeg(meal);
+}
+
+/* Filter utility */
+function filterByCategory(meals, category) {
+  if (!meals || !Array.isArray(meals)) return [];
+  if (category === "Non-Veg") return meals.filter(isNonVeg);
+  if (category === "Veg") return meals.filter(isVeg);
+  if (category === "Vegan") return meals.filter(isVegan);
+  return meals;
+}
 
 export default function App() {
   const [category, setCategory] = useState("Non-Veg");
@@ -15,20 +82,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [favorites, setFavorites] = useState([]);
+const [favorites, setFavorites] = useState(() => {
+  try {
+    const savedFavorites = localStorage.getItem("my_recipe_favs");
+    return savedFavorites ? JSON.parse(savedFavorites) : [];
+  } catch (error) {
+    console.error("Error loading favorites from localStorage", error);
+    return [];
+  }
+});
 
-  // Load favorites from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("my_recipe_favs");
-      if (raw) setFavorites(JSON.parse(raw));
-    } catch (e) {}
-  }, []);
-
-  // Persist favorites
-  useEffect(() => {
+// Persist favorites to localStorage whenever favorites change
+useEffect(() => {
+  if (favorites.length > 0) {
     localStorage.setItem("my_recipe_favs", JSON.stringify(favorites));
-  }, [favorites]);
+  }
+}, [favorites]);
 
   // Fetch recipes
   async function fetchRecipes(customIngredient) {
@@ -45,10 +114,15 @@ export default function App() {
         q
       )}`;
       const res = await fetch(url);
+
       if (!res.ok) throw new Error("Network error");
       const data = await res.json();
-      setRecipes(data.meals || []);
-      if (!data.meals) setError(`No recipes found for "${q}".`);
+      setRecipes(filterByCategory(data.meals || [], category));
+
+      if (!data.meals)
+        setError(
+          `We're cooking up recipes for "${q}" soon! Try another ingredient meanwhile`
+        );
     } catch {
       setError("Failed to fetch recipes.");
     } finally {
@@ -111,7 +185,7 @@ export default function App() {
         {/* Navbar */}
         <header className="flex justify-between items-center bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-4 shadow-sm mb-6">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-brown">
-            The Recipe Hub 
+            The Recipe Hub
           </h1>
           <button
             onClick={() => setRecipes(favorites)}
@@ -127,7 +201,43 @@ export default function App() {
             {Object.keys(categoryItems).map((cat) => (
               <button
                 key={cat}
-                onClick={() => setCategory(cat)}
+                onClick={async () => {
+                  setCategory(cat);
+                  setLoading(true);
+                  setError(null);
+                  setRecipes([]);
+
+                  try {
+                    // Get all ingredients for selected category
+                    const ingredients = categoryItems[cat];
+
+                    // Fetch recipes for each ingredient
+                    const allData = await Promise.all(
+                      ingredients.map(async (ing) => {
+                        const res = await fetch(
+                          `https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(
+                            ing
+                          )}`
+                        );
+                        const data = await res.json();
+                        return data.meals || [];
+                      })
+                    );
+
+                    // Merge all and remove duplicates by idMeal
+                    const merged = allData.flat().reduce((acc, meal) => {
+                      if (!acc.some((m) => m.idMeal === meal.idMeal))
+                        acc.push(meal);
+                      return acc;
+                    }, []);
+
+                    setRecipes(filterByCategory(merged, cat));
+                  } catch {
+                    setError("Failed to fetch category recipes.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition ${
                   category === cat
                     ? "bg-brown text-white"
@@ -156,16 +266,16 @@ export default function App() {
           </div>
 
           {/* Search Input */}
-          <div className="flex gap-3 items-center justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center w-full px-2">
             <input
               value={ingredient}
               onChange={(e) => setIngredient(e.target.value)}
-              className="flex-1 p-3 rounded-xl border border-beige bg-white/70 focus:outline-none max-w-md"
+              className="w-full sm:flex-1 p-3 rounded-xl border border-beige bg-white/70 focus:outline-none"
               placeholder="Type an ingredient (e.g., Chicken or Tomato)"
             />
             <button
               onClick={() => fetchRecipes()}
-              className="px-5 py-3 rounded-xl bg-brown text-white font-semibold hover:bg-brown/90 transition"
+              className="px-5 py-3 rounded-xl bg-brown text-white font-semibold hover:bg-brown/90 transition w-full sm:w-auto"
             >
               Search
             </button>
@@ -193,7 +303,8 @@ export default function App() {
               className="w-28 h-28 mb-6 opacity-90"
             />
             <h2 className="text-3xl font-semibold text-[#3c2f2f] mb-2">
-              Explore Delicious Recipes 🍽️
+              Hey! What do you feel like cooking today? Explore Delicious
+              Recipes 🍽️
             </h2>
             <p className="text-[#6b4f36] max-w-md text-sm">
               Choose a category or ingredient to discover amazing dishes from
@@ -243,8 +354,8 @@ export default function App() {
           </main>
         )}
 
-                {/* Modal for recipe details */}
-                {selected && (
+        {/* Modal for recipe details */}
+        {selected && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="bg-white rounded-2xl max-w-3xl w-full shadow-lg flex flex-col max-h-[90vh] overflow-hidden">
               {/* Header */}
